@@ -1,0 +1,513 @@
+openapi: 3.0.0
+info:
+  title: Todo Backend API
+  description: |
+    A RESTful API for managing users and todos.
+    
+    ## Authentication
+    This API uses **JWT Bearer Token** authentication.
+    1. Register a new user via `POST /api/user/register`
+    2. Login via `POST /api/user/login` to get a token
+    3. Click the **Authorize** button and paste your token to access protected routes.
+  version: 1.0.0
+  contact:
+    name: Vishnu Prajapat
+
+servers:
+  - url: http://localhost:3000
+    description: Local Development Server
+
+tags:
+  - name: Auth
+    description: User registration and login
+  - name: Todos
+    description: Todo CRUD operations (require authentication)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Vishnu Prajapat
+        email:
+          type: string
+          format: email
+          example: vishnu@example.com
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Todo:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Buy groceries
+        completed:
+          type: boolean
+          example: false
+        userId:
+          type: integer
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: An error occurred
+
+paths:
+  # ─── AUTH ROUTES ──────────────────────────────────────────────
+
+  /api/user/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      description: Creates a new user account. Email must be unique.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  example: Vishnu Prajapat
+                email:
+                  type: string
+                  format: email
+                  example: vishnu@example.com
+                password:
+                  type: string
+                  minLength: 8
+                  example: mypassword123
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+              example:
+                success: true
+                message: User registered successfully
+                data:
+                  id: 1
+                  name: Vishnu Prajapat
+                  email: vishnu@example.com
+                  createdAt: "2024-01-01T00:00:00.000Z"
+                  updatedAt: "2024-01-01T00:00:00.000Z"
+        '400':
+          description: Validation error (e.g., invalid email, password too short)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: password must be at least 8 characters long
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: A record with this email already exists.
+
+  /api/user/login:
+    post:
+      tags:
+        - Auth
+      summary: Login and get JWT token
+      description: Authenticates a user and returns a JWT token. Use this token in protected routes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: vishnu@example.com
+                password:
+                  type: string
+                  example: mypassword123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+                          token:
+                            type: string
+              example:
+                success: true
+                message: Login successful
+                data:
+                  user:
+                    id: 1
+                    name: Vishnu Prajapat
+                    email: vishnu@example.com
+                    createdAt: "2024-01-01T00:00:00.000Z"
+                    updatedAt: "2024-01-01T00:00:00.000Z"
+                  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Invalid email or password
+
+  # ─── TODO ROUTES ──────────────────────────────────────────────
+
+  /api/todos:
+    get:
+      tags:
+        - Todos
+      summary: Get all todos for the logged-in user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Todos fetched successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Todo'
+              example:
+                success: true
+                message: Todos fetched successfully
+                data:
+                  - id: 1
+                    title: Buy groceries
+                    completed: false
+                    userId: 1
+                    createdAt: "2024-01-01T00:00:00.000Z"
+                    updatedAt: "2024-01-01T00:00:00.000Z"
+        '401':
+          description: Unauthorized - Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Authorization header is required
+
+    post:
+      tags:
+        - Todos
+      summary: Create a new todo
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  example: Buy groceries
+      responses:
+        '201':
+          description: Todo created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Todo'
+              example:
+                success: true
+                message: Todo created successfully
+                data:
+                  id: 1
+                  title: Buy groceries
+                  completed: false
+                  userId: 1
+                  createdAt: "2024-01-01T00:00:00.000Z"
+                  updatedAt: "2024-01-01T00:00:00.000Z"
+        '400':
+          description: Validation error (e.g., title is empty)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: title must be a non-empty string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/todos/{id}:
+    patch:
+      tags:
+        - Todos
+      summary: Update a todo's title
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the todo to update
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  example: Buy groceries and cook dinner
+      responses:
+        '200':
+          description: Todo updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Todo'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Provide title to update
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Todo not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Todo not found
+
+    delete:
+      tags:
+        - Todos
+      summary: Delete a todo
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the todo to delete
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Todo deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                message: Todo deleted successfully
+                data: null
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Todo not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Todo not found
+
+  /api/todos/{id}/complete:
+    patch:
+      tags:
+        - Todos
+      summary: Mark a todo as complete or incomplete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the todo
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - completed
+              properties:
+                completed:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: Todo marked as completed or incomplete
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Todo'
+              examples:
+                completed:
+                  summary: Marking as completed
+                  value:
+                    success: true
+                    message: Todo marked as completed
+                    data:
+                      id: 1
+                      title: Buy groceries
+                      completed: true
+                      userId: 1
+                incomplete:
+                  summary: Marking as incomplete
+                  value:
+                    success: true
+                    message: Todo marked as incomplete
+                    data:
+                      id: 1
+                      title: Buy groceries
+                      completed: false
+                      userId: 1
+        '400':
+          description: Completed status must be a boolean
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Completed status must be a boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Todo not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Todo not found
