@@ -1,16 +1,20 @@
 import express from "express";
+import cors from "cors";
+import { requestLogger } from "./middlewares/logging.middleware.js";
 import { todoRouter } from "./routes/todo.routes.js";
 import { userRouter } from "./routes/user.routes.js";
-import { sendError, sendSuccess } from "./utils/response.js";
- import cors from "cors";
+import { globalErrorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
+import { sendSuccess } from "./utils/response.js";
+
 const app = express();
 
+app.use(requestLogger);
 app.use(cors({
-  origin:"http://localhost:5173",
-  credentials:true
-}
-));
+  origin: "http://localhost:5173",
+  credentials: true,
+}));
 app.use(express.json());
+
 app.get("/", (req, res) =>
   sendSuccess(
     res,
@@ -26,16 +30,7 @@ app.get("/", (req, res) =>
 app.use("/api/todos", todoRouter);
 app.use("/api/user", userRouter);
 
-app.use((req, res) => sendError(res, 404, "Route not found"));
-
-app.use((error, req, res, next) => {
-  if (res.headersSent) {
-    return next(error);
-  }
-
-  const statusCode = error.statusCode ?? 500;
-  const message = error.message ?? "Internal server error";
-  return sendError(res, statusCode, message, error.details);
-});
+app.use(notFoundHandler);
+app.use(globalErrorHandler);
 
 export { app };
