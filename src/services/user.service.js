@@ -62,55 +62,81 @@ const formatUser = (user) => ({
   updatedAt: user.updatedAt,
 });
 
+const logAuthError = (operation, metadata, error) => {
+  console.error(`[UserService] ${operation} failed`, {
+    ...metadata,
+    message: error?.message,
+  });
+};
+
 const register = async (payload) => {
-  const input = payload ?? {};
-  const name = validateName(input.name);
-  const email = validateEmail(input.email);
-  const password = validatePassword(input.password);
+  try {
+    const input = payload ?? {};
+    const name = validateName(input.name);
+    const email = validateEmail(input.email);
+    const password = validatePassword(input.password);
 
-  const existingUser = await findUserByEmail(email);
-  if (existingUser) {
-    throw createHttpError(409, "A user with this email already exists");
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
+      throw createHttpError(409, "A user with this email already exists");
+    }
+
+    const passwordHash = await hashPassword(password);
+    const user = await createUser({ name, email, password: passwordHash });
+    console.log(`[UserService] User registered`, {
+      userId: user.id,
+      email: user.email,
+    });
+    return formatUser(user);
+  } catch (error) {
+    logAuthError("register", { email: payload?.email }, error);
+    throw error;
   }
-
-  const passwordHash = await hashPassword(password);
-  const user = await createUser({ name, email, password: passwordHash });
-  return formatUser(user);
 };
 
 const login = async (payload) => {
-  const input = payload ?? {};
-  const email = validateEmail(input.email);
-  const password = validatePassword(input.password);
+  try {
+    const input = payload ?? {};
+    const email = validateEmail(input.email);
+    const password = validatePassword(input.password);
 
-  const user = await findUserByEmailWithPassword(email);
+    const user = await findUserByEmailWithPassword(email);
 
-  if (!user) {
-    throw createHttpError(401, "Invalid email or password");
-  }
+    if (!user) {
+      throw createHttpError(401, "Invalid email or password");
+    }
 
-  const isPasswordValid = await verifyPassword(password, user.password);
+    const isPasswordValid = await verifyPassword(password, user.password);
 
-  if (!isPasswordValid) {
-    throw createHttpError(401, "Invalid email or password");
-  }
+    if (!isPasswordValid) {
+      throw createHttpError(401, "Invalid email or password");
+    }
 
-  const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-me";
-  const token = jwt.sign(
-    {
+    const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-me";
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+      },
+      jwtSecret,
+      {
+        expiresIn: "1d",
+      },
+    );
+
+    console.log(`[UserService] User login successful`, {
       userId: user.id,
       email: user.email,
-    },
-    jwtSecret,
-    {
-      expiresIn: "1d",
-    },
-  );
+    });
 
-  return {
-    user: formatUser(user),
-    token,
-  };
+    return {
+      user: formatUser(user),
+      token,
+    };
+  } catch (error) {
+    logAuthError("login", { email: payload?.email }, error);
+    throw error;
+  }
 };
 
 export { login, register };

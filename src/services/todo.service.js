@@ -36,65 +36,115 @@ const formatTodo = (todo) => ({
   user: todo.user,
 });
 
+const logServiceError = (operation, metadata, error) => {
+  console.error(`[TodoService] ${operation} failed`, {
+    ...metadata,
+    message: error?.message,
+  });
+};
+
 const getAllTodos = async (userId) => {
-  const parsedUserId = parsePositiveInt(userId, "userId");
-  const todos = await listTodosByUserId(parsedUserId);
-  return todos.map(formatTodo);
+  try {
+    const parsedUserId = parsePositiveInt(userId, "userId");
+    const todos = await listTodosByUserId(parsedUserId);
+    console.log(`[TodoService] Todos fetched for user ${parsedUserId}`, {
+      count: todos.length,
+    });
+    return todos.map(formatTodo);
+  } catch (error) {
+    logServiceError("getAllTodos", { userId }, error);
+    throw error;
+  }
 };
 
 const addTodo = async (payload, userId) => {
-  const title = validateTitle(payload.title);
-  const parsedUserId = parsePositiveInt(userId, "userId");
-  const todo = await createTodo({ title, userId: parsedUserId });
-  return formatTodo(todo);
+  try {
+    const title = validateTitle(payload.title);
+    const parsedUserId = parsePositiveInt(userId, "userId");
+    const todo = await createTodo({ title, userId: parsedUserId });
+    console.log(`[TodoService] Todo created for user ${parsedUserId}`, {
+      todoId: todo.id,
+      title: todo.title,
+    });
+    return formatTodo(todo);
+  } catch (error) {
+    logServiceError("addTodo", { userId, title: payload?.title }, error);
+    throw error;
+  }
 };
 
 const completeTodoService = async (id, completed, userId) => {
-  const todoId = parsePositiveInt(id, "todoId");
-  const parsedUserId = parsePositiveInt(userId, "userId");
-  const existingTodo = await getTodoByIdAndUserId(todoId, parsedUserId);
+  try {
+    const todoId = parsePositiveInt(id, "todoId");
+    const parsedUserId = parsePositiveInt(userId, "userId");
+    const existingTodo = await getTodoByIdAndUserId(todoId, parsedUserId);
 
-  if (!existingTodo) {
-    throw createHttpError(404, "Todo not found");
+    if (!existingTodo) {
+      throw createHttpError(404, "Todo not found");
+    }
+
+    const todo = await completeTodo(todoId, completed);
+    console.log(`[TodoService] Todo completion updated for user ${parsedUserId}`, {
+      todoId: todo.id,
+      completed: todo.completed,
+    });
+    return formatTodo(todo);
+  } catch (error) {
+    logServiceError("completeTodoService", { id, completed, userId }, error);
+    throw error;
   }
-
-  const todo = await completeTodo(todoId, completed);
-  return formatTodo(todo);
-}
+};
 
 const editTodo = async (id, payload, userId) => {
-  const todoId = parsePositiveInt(id, "todoId");
-  const parsedUserId = parsePositiveInt(userId, "userId");
-  const existingTodo = await getTodoByIdAndUserId(todoId, parsedUserId);
+  try {
+    const todoId = parsePositiveInt(id, "todoId");
+    const parsedUserId = parsePositiveInt(userId, "userId");
+    const existingTodo = await getTodoByIdAndUserId(todoId, parsedUserId);
 
-  if (!existingTodo) {
-    throw createHttpError(404, "Todo not found");
+    if (!existingTodo) {
+      throw createHttpError(404, "Todo not found");
+    }
+
+    const updates = {};
+
+    if (Object.prototype.hasOwnProperty.call(payload, "title")) {
+      updates.title = validateTitle(payload.title);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      throw createHttpError(400, "Provide title to update");
+    }
+
+    const todo = await updateTodo(todoId, updates);
+    console.log(`[TodoService] Todo edited for user ${parsedUserId}`, {
+      todoId: todo.id,
+      updatedFields: Object.keys(updates),
+    });
+    return formatTodo(todo);
+  } catch (error) {
+    logServiceError("editTodo", { id, userId }, error);
+    throw error;
   }
-
-  const updates = {};
-
-  if (Object.prototype.hasOwnProperty.call(payload, "title")) {
-    updates.title = validateTitle(payload.title);
-  }
-
-  if (Object.keys(updates).length === 0) {
-    throw createHttpError(400, "Provide title to update");
-  }
-
-  const todo = await updateTodo(todoId, updates);
-  return formatTodo(todo);
 };
 
 const removeTodo = async (id, userId) => {
-  const todoId = parsePositiveInt(id, "todoId");
-  const parsedUserId = parsePositiveInt(userId, "userId");
-  const todo = await getTodoByIdAndUserId(todoId, parsedUserId);
+  try {
+    const todoId = parsePositiveInt(id, "todoId");
+    const parsedUserId = parsePositiveInt(userId, "userId");
+    const todo = await getTodoByIdAndUserId(todoId, parsedUserId);
 
-  if (!todo) {
-    throw createHttpError(404, "Todo not found");
+    if (!todo) {
+      throw createHttpError(404, "Todo not found");
+    }
+
+    await deleteTodo(todoId);
+    console.log(`[TodoService] Todo deleted for user ${parsedUserId}`, {
+      todoId,
+    });
+  } catch (error) {
+    logServiceError("removeTodo", { id, userId }, error);
+    throw error;
   }
-
-  await deleteTodo(todoId);
 };
 
 export { addTodo, editTodo, getAllTodos, removeTodo, completeTodoService };
